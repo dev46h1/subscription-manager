@@ -7,8 +7,12 @@ import 'screens/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize notification service
-  await NotificationService().init();
+  // Initialize notification service with error handling
+  try {
+    await NotificationService().init();
+  } catch (e) {
+    print('Failed to initialize notifications: $e');
+  }
   
   runApp(
     ChangeNotifierProvider(

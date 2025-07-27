@@ -43,8 +43,15 @@ class SubscriptionProvider extends ChangeNotifier {
     
     try {
       _subscriptions = await DatabaseHelper.instance.readAllSubscriptions();
-      // Check for notifications after loading
-      await NotificationService().checkAndScheduleAllNotifications(_subscriptions);
+      
+      // Delay notification check to ensure platform is ready
+      Future.delayed(const Duration(milliseconds: 500), () async {
+        try {
+          await NotificationService().checkAndScheduleAllNotifications(_subscriptions);
+        } catch (e) {
+          debugPrint('Error scheduling notifications: $e');
+        }
+      });
     } catch (e) {
       debugPrint('Error loading subscriptions: $e');
     }
