@@ -10,22 +10,30 @@ class NotificationService {
   NotificationService._init();
 
   Future<void> init() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-    
-    const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-    
-    await _notifications.initialize(
-      settings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-    );
+    try {
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+      
+      const settings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+      
+      final result = await _notifications.initialize(
+        settings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
+      
+      if (result != true) {
+        print('Notification initialization failed');
+      }
+    } catch (e) {
+      print('Error initializing notifications: $e');
+    }
   }
 
   void _onNotificationTapped(NotificationResponse response) {
@@ -34,17 +42,22 @@ class NotificationService {
   }
 
   Future<void> scheduleNotification(Subscription subscription) async {
-    final daysUntil = subscription.daysUntilRenewal;
-    
-    // Cancel any existing notifications for this subscription
-    await _notifications.cancel(subscription.id ?? 0);
-    
-    if (daysUntil == 1 || daysUntil == 2) {
-      await _showNotification(
-        id: subscription.id ?? 0,
-        title: 'Subscription Renewal Reminder',
-        body: '${subscription.name} will renew in $daysUntil day${daysUntil == 1 ? '' : 's'} for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
-      );
+    try {
+      final daysUntil = subscription.daysUntilRenewal;
+      
+      // Cancel any existing notifications for this subscription
+      await cancelNotification(subscription.id ?? 0);
+      
+      if (daysUntil == 1 || daysUntil == 2) {
+        await _showNotification(
+          id: subscription.id ?? 0,
+          title: 'Subscription Renewal Reminder',
+          body: '${subscription.name} will renew in $daysUntil day${daysUntil == 1 ? '' : 's'} for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        );
+      }
+    } catch (e) {
+      print('Error scheduling notification: $e');
+      // Don't throw the error, just log it
     }
   }
 
@@ -77,16 +90,31 @@ class NotificationService {
   }
 
   Future<void> checkAndScheduleAllNotifications(List<Subscription> subscriptions) async {
-    for (var subscription in subscriptions) {
-      await scheduleNotification(subscription);
+    try {
+      for (var subscription in subscriptions) {
+        await scheduleNotification(subscription);
+      }
+    } catch (e) {
+      print('Error in checkAndScheduleAllNotifications: $e');
+      // Continue even if there's an error
     }
   }
 
   Future<void> cancelNotification(int id) async {
-    await _notifications.cancel(id);
+    try {
+      await _notifications.cancel(id);
+    } catch (e) {
+      print('Error canceling notification: $e');
+      // Don't throw the error, just log it
+    }
   }
 
   Future<void> cancelAllNotifications() async {
-    await _notifications.cancelAll();
+    try {
+      await _notifications.cancelAll();
+    } catch (e) {
+      print('Error canceling all notifications: $e');
+      // Don't throw the error, just log it
+    }
   }
 }
