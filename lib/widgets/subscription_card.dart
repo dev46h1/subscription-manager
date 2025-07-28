@@ -116,9 +116,10 @@ class SubscriptionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Subscription name with billing period chip inline
                     Row(
                       children: [
-                        Expanded(
+                        Flexible(
                           child: Text(
                             subscription.name,
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -128,7 +129,7 @@ class SubscriptionCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 8),
                         _buildBillingPeriodChip(context),
                       ],
                     ),
