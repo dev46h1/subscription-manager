@@ -132,61 +132,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
                 
-                // Enhanced spending summary cards
+                // 2x2 Spending Summary Grid
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        // Monthly spending card
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Theme.of(context).colorScheme.primary,
-                                Theme.of(context).colorScheme.secondary,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Monthly Spending',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '\₹${provider.totalMonthlySpend.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '\₹${provider.totalYearlySpend.toStringAsFixed(2)}/year',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.8),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        
-                        // Billing period summary cards
+                        // First row: Monthly and Quarterly
                         Row(
                           children: [
+                            Expanded(
+                              child: _buildPeriodCard(
+                                context,
+                                'Monthly',
+                                '\₹${provider.totalMonthlySpend.toStringAsFixed(2)}',
+                                Colors.blue,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: _buildPeriodCard(
                                 context,
@@ -195,7 +158,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Colors.green,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        // Second row: Half Yearly and Yearly
+                        Row(
+                          children: [
                             Expanded(
                               child: _buildPeriodCard(
                                 context,
@@ -204,16 +173,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Colors.orange,
                               ),
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildPeriodCard(
+                                context,
+                                'Yearly',
+                                '\₹${provider.totalYearlySpend.toStringAsFixed(2)}',
+                                Colors.purple,
+                              ),
+                            ),
                           ],
-                        ),
-                        const SizedBox(height: 8),
-                        
-                        // Single row for Yearly card
-                        _buildPeriodCard(
-                          context,
-                          'Yearly',
-                          '\₹${provider.totalYearlySpend.toStringAsFixed(2)}',
-                          Colors.purple,
                         ),
                       ],
                     ),
@@ -343,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             amount,
             style: TextStyle(
