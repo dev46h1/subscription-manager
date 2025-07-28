@@ -20,8 +20,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Incremented version for schema update
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -39,9 +40,17 @@ class DatabaseHelper {
         currency $textType,
         renewal_date $textType,
         category $textType,
-        notes $textTypeNullable
+        notes $textTypeNullable,
+        billing_period $textType DEFAULT 'monthly'
       )
     ''');
+  }
+
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add billing_period column for existing databases
+      await db.execute('ALTER TABLE subscriptions ADD COLUMN billing_period TEXT DEFAULT "monthly"');
+    }
   }
 
   Future<int> createSubscription(Subscription subscription) async {

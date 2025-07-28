@@ -22,6 +22,7 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
   
   String _currency = 'INR';
   String _category = 'Entertainment';
+  BillingPeriod _billingPeriod = BillingPeriod.monthly;
   DateTime _renewalDate = DateTime.now().add(const Duration(days: 30));
   bool _isSaving = false;
 
@@ -50,6 +51,7 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
     if (widget.subscription != null) {
       _currency = widget.subscription!.currency;
       _category = widget.subscription!.category;
+      _billingPeriod = widget.subscription!.billingPeriod;
       _renewalDate = widget.subscription!.renewalDate;
     }
   }
@@ -67,7 +69,7 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
       context: context,
       initialDate: _renewalDate,
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)), // Extended to 2 years for yearly subscriptions
     );
     
     if (picked != null) {
@@ -92,6 +94,7 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
           renewalDate: _renewalDate,
           category: _category,
           notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+          billingPeriod: _billingPeriod,
         );
 
         final provider = context.read<SubscriptionProvider>();
@@ -157,16 +160,30 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
   }
 
   int _calculateDaysUntilRenewal(DateTime renewalDate) {
-  // Get today's date at midnight (start of day)
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  
-  // Get renewal date at midnight (start of day)
-  final renewal = DateTime(renewalDate.year, renewalDate.month, renewalDate.day);
-  
-  // Calculate difference in days
-  return renewal.difference(today).inDays;
-}
+    // Get today's date at midnight (start of day)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Get renewal date at midnight (start of day)
+    final renewal = DateTime(renewalDate.year, renewalDate.month, renewalDate.day);
+    
+    // Calculate difference in days
+    return renewal.difference(today).inDays;
+  }
+
+  double _calculateMonthlyEquivalent() {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    switch (_billingPeriod) {
+      case BillingPeriod.monthly:
+        return amount;
+      case BillingPeriod.quarterly:
+        return amount / 3;
+      case BillingPeriod.sixMonthly:
+        return amount / 6;
+      case BillingPeriod.yearly:
+        return amount / 12;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -223,6 +240,9 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                     ],
+                    onChanged: (value) {
+                      setState(() {}); // Trigger rebuild to update monthly equivalent
+                    },
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter amount';
@@ -259,6 +279,60 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // Billing Period
+            DropdownButtonFormField<BillingPeriod>(
+              value: _billingPeriod,
+              decoration: const InputDecoration(
+                labelText: 'Billing Period',
+                prefixIcon: Icon(Icons.schedule),
+                border: OutlineInputBorder(),
+              ),
+              items: BillingPeriod.values.map((period) {
+                return DropdownMenuItem(
+                  value: period,
+                  child: Text(period.displayName),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _billingPeriod = value!;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Monthly equivalent display
+            if (_amountController.text.isNotEmpty && _calculateMonthlyEquivalent() != double.tryParse(_amountController.text))
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Monthly equivalent: $_currency ${_calculateMonthlyEquivalent().toStringAsFixed(2)}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (_amountController.text.isNotEmpty && _calculateMonthlyEquivalent() != double.tryParse(_amountController.text))
+              const SizedBox(height: 16),
             
             // Category
             DropdownButtonFormField<String>(
@@ -287,7 +361,7 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
               onTap: _selectDate,
               child: InputDecorator(
                 decoration: const InputDecoration(
-                  labelText: 'Renewal Date',
+                  labelText: 'Next Renewal Date',
                   prefixIcon: Icon(Icons.calendar_today),
                   border: OutlineInputBorder(),
                 ),
@@ -307,37 +381,40 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
             
             // Days until renewal info
             Container(
-  padding: const EdgeInsets.all(12),
-  decoration: BoxDecoration(
-    color: Theme.of(context).colorScheme.primaryContainer,
-    borderRadius: BorderRadius.circular(8),
-  ),
-  child: Row(
-    children: [
-      Icon(
-        Icons.info_outline,
-        size: 20,
-        color: Theme.of(context).colorScheme.onPrimaryContainer,
-      ),
-      const SizedBox(width: 8),
-      Text(
-        () {
-          final days = _calculateDaysUntilRenewal(_renewalDate);
-          if (days == 0) {
-            return 'Renews today';
-          } else if (days == 1) {
-            return 'Renews in 1 day';
-          } else {
-            return 'Renews in $days days';
-          }
-        }(),
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.onPrimaryContainer,
-        ),
-      ),
-    ],
-  ),
-),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      () {
+                        final days = _calculateDaysUntilRenewal(_renewalDate);
+                        if (days == 0) {
+                          return 'Renews today';
+                        } else if (days == 1) {
+                          return 'Renews in 1 day';
+                        } else {
+                          return 'Renews in $days days';
+                        }
+                      }(),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
             
             // Notes
