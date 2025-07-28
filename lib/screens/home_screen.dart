@@ -157,10 +157,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 subscription: subscription,
                               ),
                             ),
-                          ).then((_) {
-                            // Reload subscriptions when returning from edit screen
-                            provider.loadSubscriptions();
-                          });
+                          );
+                          // Removed the .then() callback that was reloading subscriptions
                         },
                       );
                     },
@@ -184,10 +182,8 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(
               builder: (context) => const AddEditSubscriptionScreen(),
             ),
-          ).then((_) {
-            // Reload subscriptions when returning from add screen
-            context.read<SubscriptionProvider>().loadSubscriptions();
-          });
+          );
+          // Removed the .then() callback that was reloading subscriptions
         },
         icon: const Icon(Icons.add),
         label: const Text('Add Subscription'),

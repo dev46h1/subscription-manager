@@ -156,6 +156,18 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
     }
   }
 
+  int _calculateDaysUntilRenewal(DateTime renewalDate) {
+  // Get today's date at midnight (start of day)
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  
+  // Get renewal date at midnight (start of day)
+  final renewal = DateTime(renewalDate.year, renewalDate.month, renewalDate.day);
+  
+  // Calculate difference in days
+  return renewal.difference(today).inDays;
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -295,28 +307,37 @@ class _AddEditSubscriptionScreenState extends State<AddEditSubscriptionScreen> {
             
             // Days until renewal info
             Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Renews in ${_renewalDate.difference(DateTime.now()).inDays} days',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+  padding: const EdgeInsets.all(12),
+  decoration: BoxDecoration(
+    color: Theme.of(context).colorScheme.primaryContainer,
+    borderRadius: BorderRadius.circular(8),
+  ),
+  child: Row(
+    children: [
+      Icon(
+        Icons.info_outline,
+        size: 20,
+        color: Theme.of(context).colorScheme.onPrimaryContainer,
+      ),
+      const SizedBox(width: 8),
+      Text(
+        () {
+          final days = _calculateDaysUntilRenewal(_renewalDate);
+          if (days == 0) {
+            return 'Renews today';
+          } else if (days == 1) {
+            return 'Renews in 1 day';
+          } else {
+            return 'Renews in $days days';
+          }
+        }(),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
+      ),
+    ],
+  ),
+),
             const SizedBox(height: 16),
             
             // Notes

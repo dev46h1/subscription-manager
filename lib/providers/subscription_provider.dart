@@ -18,9 +18,7 @@ class SubscriptionProvider extends ChangeNotifier {
   double get totalMonthlySpend {
     double total = 0;
     for (var sub in _subscriptions) {
-      // Convert to USD for calculation (you might want to add real conversion rates)
-      double amountInUSD = sub.amount;
-      total += amountInUSD;
+      total += sub.amount;
     }
     return total;
   }
@@ -44,14 +42,10 @@ class SubscriptionProvider extends ChangeNotifier {
     try {
       _subscriptions = await DatabaseHelper.instance.readAllSubscriptions();
       
-      // Delay notification check to ensure platform is ready
-      Future.delayed(const Duration(milliseconds: 500), () async {
-        try {
-          await NotificationService().checkAndScheduleAllNotifications(_subscriptions);
-        } catch (e) {
-          debugPrint('Error scheduling notifications: $e');
-        }
-      });
+      // Only schedule notifications for all subscriptions during initial app load
+      // This prevents showing notifications when returning from add/edit screens
+      await _scheduleAllNotificationsQuietly();
+      
     } catch (e) {
       debugPrint('Error loading subscriptions: $e');
     }
@@ -60,14 +54,42 @@ class SubscriptionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _scheduleAllNotificationsQuietly() async {
+    try {
+      final notificationService = NotificationService();
+      
+      // Check if notifications are enabled
+      final enabled = await notificationService.areNotificationsEnabled();
+      if (!enabled) {
+        debugPrint('Notifications are disabled, skipping scheduling');
+        return;
+      }
+      
+      // Add a small delay to ensure the app is fully initialized
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      // Schedule notifications quietly (without showing immediate notifications for existing subscriptions)
+      await notificationService.scheduleAllNotificationsQuietly(_subscriptions);
+      debugPrint('Successfully scheduled notifications for ${_subscriptions.length} subscriptions (quietly)');
+      
+    } catch (e) {
+      debugPrint('Error scheduling notifications: $e');
+    }
+  }
+
   Future<void> addSubscription(Subscription subscription) async {
     try {
       final id = await DatabaseHelper.instance.createSubscription(subscription);
       final newSubscription = subscription.copyWith(id: id);
       _subscriptions.add(newSubscription);
       
-      // Schedule notification for new subscription
-      await NotificationService().scheduleNotification(newSubscription);
+      // Schedule notification for ONLY this new subscription
+      try {
+        await NotificationService().scheduleNotification(newSubscription);
+        debugPrint('Notification scheduled for new subscription: ${newSubscription.name}');
+      } catch (e) {
+        debugPrint('Error scheduling notification for new subscription: $e');
+      }
       
       notifyListeners();
     } catch (e) {
@@ -84,8 +106,13 @@ class SubscriptionProvider extends ChangeNotifier {
       if (index != -1) {
         _subscriptions[index] = subscription;
         
-        // Reschedule notification for updated subscription
-        await NotificationService().scheduleNotification(subscription);
+        // Reschedule notification for ONLY this updated subscription
+        try {
+          await NotificationService().scheduleNotification(subscription);
+          debugPrint('Notification rescheduled for updated subscription: ${subscription.name}');
+        } catch (e) {
+          debugPrint('Error rescheduling notification for updated subscription: $e');
+        }
         
         notifyListeners();
       }
@@ -99,8 +126,13 @@ class SubscriptionProvider extends ChangeNotifier {
     try {
       await DatabaseHelper.instance.deleteSubscription(id);
       
-      // Cancel notification for deleted subscription
-      await NotificationService().cancelNotification(id);
+      // Cancel notification for deleted subscription (but don't show any notifications)
+      try {
+        await NotificationService().cancelNotification(id);
+        debugPrint('Notification cancelled for deleted subscription ID: $id');
+      } catch (e) {
+        debugPrint('Error cancelling notification for deleted subscription: $e');
+      }
       
       _subscriptions.removeWhere((s) => s.id == id);
       notifyListeners();
@@ -112,5 +144,15 @@ class SubscriptionProvider extends ChangeNotifier {
 
   List<Subscription> getUpcomingRenewals(int days) {
     return _subscriptions.where((s) => s.daysUntilRenewal <= days).toList();
+  }
+
+  // Method to manually refresh notifications (useful for debugging or settings)
+  Future<void> refreshNotifications() async {
+    try {
+      await _scheduleAllNotificationsQuietly();
+      debugPrint('Notifications refreshed successfully');
+    } catch (e) {
+      debugPrint('Error refreshing notifications: $e');
+    }
   }
 }
