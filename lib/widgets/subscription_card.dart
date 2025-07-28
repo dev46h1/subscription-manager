@@ -44,6 +44,41 @@ class SubscriptionCard extends StatelessWidget {
     }
   }
 
+  Widget _buildBillingPeriodChip(BuildContext context) {
+    Color chipColor;
+    switch (subscription.billingPeriod) {
+      case BillingPeriod.monthly:
+        chipColor = Colors.blue;
+        break;
+      case BillingPeriod.quarterly:
+        chipColor = Colors.green;
+        break;
+      case BillingPeriod.sixMonthly:
+        chipColor = Colors.orange;
+        break;
+      case BillingPeriod.yearly:
+        chipColor = Colors.purple;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: chipColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: chipColor.withOpacity(0.3)),
+      ),
+      child: Text(
+        subscription.billingPeriod.shortDisplayName,
+        style: TextStyle(
+          color: chipColor,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final daysRemaining = subscription.daysUntilRenewal;
@@ -81,17 +116,43 @@ class SubscriptionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      subscription.name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    // Subscription name with billing period chip inline
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            subscription.name,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildBillingPeriodChip(context),
+                      ],
                     ),
                     const SizedBox(height: 4),
+                    // Main amount on its own line to prevent overflow
                     Text(
-                      '${subscription.currency} ${subscription.amount.toStringAsFixed(2)}/month',
+                      '${subscription.currency} ${subscription.amount.toStringAsFixed(2)}${subscription.billingPeriodDisplayText}',
                       style: Theme.of(context).textTheme.bodyLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    // Monthly equivalent on separate line if different from main amount
+                    if (subscription.billingPeriod != BillingPeriod.monthly) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        '(${subscription.currency} ${subscription.monthlyEquivalent.toStringAsFixed(2)}/mo)',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -101,9 +162,13 @@ class SubscriptionCard extends StatelessWidget {
                           color: Theme.of(context).textTheme.bodySmall?.color,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          'Renews: ${DateFormat('MMM dd, yyyy').format(subscription.renewalDate)}',
-                          style: Theme.of(context).textTheme.bodySmall,
+                        Expanded(
+                          child: Text(
+                            'Renews: ${DateFormat('MMM dd, yyyy').format(subscription.renewalDate)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),

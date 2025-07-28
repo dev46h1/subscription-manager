@@ -69,6 +69,16 @@ class NotificationService {
     // Handle notification tap - you can navigate to specific screen here
   }
 
+  String _getNotificationBody(Subscription subscription) {
+    final periodText = subscription.billingPeriod.displayName.toLowerCase();
+    return '${subscription.name} ($periodText subscription) will renew for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}';
+  }
+
+  String _getRenewalNotificationBody(Subscription subscription) {
+    final periodText = subscription.billingPeriod.displayName.toLowerCase();
+    return '${subscription.name} ($periodText subscription) is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}';
+  }
+
  Future<void> scheduleNotification(Subscription subscription) async {
   if (!_isInitialized) {
     print('NotificationService not initialized');
@@ -100,10 +110,10 @@ class NotificationService {
       await _showImmediateNotification(
         id: subscriptionId * 10 + 1,
         title: 'Subscription Renewal Tomorrow',
-        body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        body: _getNotificationBody(subscription),
         payload: 'subscription_${subscription.id}_1day',
       );
-      print('Showed immediate 1-day reminder for ${subscription.name}');
+      print('Showed immediate 1-day reminder for ${subscription.name} (${subscription.billingPeriod.displayName})');
     } else if (daysUntilRenewal > 1) {
       // If renewal is more than 1 day away, schedule the 1-day reminder
       final oneDayBeforeTime = DateTime(
@@ -118,10 +128,10 @@ class NotificationService {
         id: subscriptionId * 10 + 1,
         scheduledDate: oneDayBeforeTime,
         title: 'Subscription Renewal Tomorrow',
-        body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        body: _getNotificationBody(subscription),
         payload: 'subscription_${subscription.id}_1day',
       );
-      print('Scheduled 1-day reminder for ${subscription.name} at $oneDayBeforeTime');
+      print('Scheduled 1-day reminder for ${subscription.name} (${subscription.billingPeriod.displayName}) at $oneDayBeforeTime');
     }
     
     // Handle notification on renewal day
@@ -130,10 +140,10 @@ class NotificationService {
       await _showImmediateNotification(
         id: subscriptionId * 10 + 2,
         title: 'Subscription Renewing Today',
-        body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        body: _getRenewalNotificationBody(subscription),
         payload: 'subscription_${subscription.id}_today',
       );
-      print('Showed immediate renewal day reminder for ${subscription.name}');
+      print('Showed immediate renewal day reminder for ${subscription.name} (${subscription.billingPeriod.displayName})');
     } else if (daysUntilRenewal > 0) {
       // If renewal day hasn't arrived yet, schedule it for 9 AM
       final renewalDayMorning = DateTime(
@@ -148,10 +158,10 @@ class NotificationService {
         id: subscriptionId * 10 + 2,
         scheduledDate: renewalDayMorning,
         title: 'Subscription Renewing Today',
-        body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        body: _getRenewalNotificationBody(subscription),
         payload: 'subscription_${subscription.id}_today',
       );
-      print('Scheduled renewal day reminder for ${subscription.name} at $renewalDayMorning');
+      print('Scheduled renewal day reminder for ${subscription.name} (${subscription.billingPeriod.displayName}) at $renewalDayMorning');
     }
     
   } catch (e) {
@@ -332,10 +342,10 @@ class NotificationService {
         id: subscriptionId * 10 + 1,
         scheduledDate: oneDayBeforeTime,
         title: 'Subscription Renewal Tomorrow',
-        body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        body: _getNotificationBody(subscription),
         payload: 'subscription_${subscription.id}_1day',
       );
-      print('Quietly scheduled 1-day reminder for ${subscription.name} at $oneDayBeforeTime');
+      print('Quietly scheduled 1-day reminder for ${subscription.name} (${subscription.billingPeriod.displayName}) at $oneDayBeforeTime');
     }
     
     // Schedule notification on renewal day (only if it's in the future)
@@ -352,10 +362,10 @@ class NotificationService {
         id: subscriptionId * 10 + 2,
         scheduledDate: renewalDayMorning,
         title: 'Subscription Renewing Today',
-        body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        body: _getRenewalNotificationBody(subscription),
         payload: 'subscription_${subscription.id}_today',
       );
-      print('Quietly scheduled renewal day reminder for ${subscription.name} at $renewalDayMorning');
+      print('Quietly scheduled renewal day reminder for ${subscription.name} (${subscription.billingPeriod.displayName}) at $renewalDayMorning');
     }
     
   } catch (e) {
