@@ -3,6 +3,9 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     
     <application
         android:label="Subscription Manager"
@@ -26,12 +29,22 @@
             </intent-filter>
         </activity>
         
-        <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver" android:exported="true">
-            <intent-filter>
+        <!-- Boot receiver for rescheduling notifications after device restart -->
+        <receiver 
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver" 
+            android:exported="true">
+            <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
+        
+        <!-- Receiver for handling scheduled notifications -->
+        <receiver 
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" 
+            android:exported="true" />
         
         <meta-data
             android:name="flutterEmbedding"
