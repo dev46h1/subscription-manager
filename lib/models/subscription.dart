@@ -6,7 +6,11 @@ class Subscription {
   final DateTime renewalDate;
   final String category;
   final String? notes;
-  final BillingPeriod billingPeriod; // New field
+  final BillingPeriod billingPeriod;
+  final SubscriptionStatus status; // New field
+  final DateTime createdDate; // New field
+  final DateTime? lastRenewDate; // New field for tracking renewals
+  final int renewalCount; // New field to track how many times renewed
 
   Subscription({
     this.id,
@@ -16,8 +20,12 @@ class Subscription {
     required this.renewalDate,
     required this.category,
     this.notes,
-    this.billingPeriod = BillingPeriod.monthly, // Default to monthly
-  });
+    this.billingPeriod = BillingPeriod.monthly,
+    this.status = SubscriptionStatus.active,
+    DateTime? createdDate,
+    this.lastRenewDate,
+    this.renewalCount = 0,
+  }) : createdDate = createdDate ?? DateTime.now();
 
   Map<String, dynamic> toMap() {
     return {
@@ -28,7 +36,11 @@ class Subscription {
       'renewal_date': renewalDate.toIso8601String(),
       'category': category,
       'notes': notes,
-      'billing_period': billingPeriod.name, // Store as string
+      'billing_period': billingPeriod.name,
+      'status': status.name,
+      'created_date': createdDate.toIso8601String(),
+      'last_renew_date': lastRenewDate?.toIso8601String(),
+      'renewal_count': renewalCount,
     };
   }
 
@@ -45,6 +57,15 @@ class Subscription {
         (period) => period.name == (map['billing_period'] ?? 'monthly'),
         orElse: () => BillingPeriod.monthly,
       ),
+      status: SubscriptionStatus.values.firstWhere(
+        (status) => status.name == (map['status'] ?? 'active'),
+        orElse: () => SubscriptionStatus.active,
+      ),
+      createdDate: DateTime.parse(map['created_date'] ?? DateTime.now().toIso8601String()),
+      lastRenewDate: map['last_renew_date'] != null 
+          ? DateTime.parse(map['last_renew_date']) 
+          : null,
+      renewalCount: map['renewal_count'] ?? 0,
     );
   }
 
@@ -75,16 +96,38 @@ class Subscription {
   }
 
   // Get the next renewal date based on billing period
-  DateTime getNextRenewalDate() {
+  DateTime getNextRenewalDate([DateTime? fromDate]) {
+    final baseDate = fromDate ?? renewalDate;
     switch (billingPeriod) {
       case BillingPeriod.monthly:
-        return DateTime(renewalDate.year, renewalDate.month + 1, renewalDate.day);
+        return DateTime(baseDate.year, baseDate.month + 1, baseDate.day);
       case BillingPeriod.quarterly:
-        return DateTime(renewalDate.year, renewalDate.month + 3, renewalDate.day);
+        return DateTime(baseDate.year, baseDate.month + 3, baseDate.day);
       case BillingPeriod.sixMonthly:
-        return DateTime(renewalDate.year, renewalDate.month + 6, renewalDate.day);
+        return DateTime(baseDate.year, baseDate.month + 6, baseDate.day);
       case BillingPeriod.yearly:
-        return DateTime(renewalDate.year + 1, renewalDate.month, renewalDate.day);
+        return DateTime(baseDate.year + 1, baseDate.month, baseDate.day);
+    }
+  }
+
+  // Smart renewal date suggestion - if overdue, suggest next cycle from today
+  DateTime getSmartRenewalDate() {
+    final today = DateTime.now();
+    final currentRenewal = DateTime(renewalDate.year, renewalDate.month, renewalDate.day);
+    
+    if (currentRenewal.isAfter(today) || currentRenewal.isAtSameMomentAs(today)) {
+      // Not overdue, suggest next cycle from current renewal date
+      return getNextRenewalDate();
+    } else {
+      // Overdue, suggest next cycle from today
+      DateTime nextFromToday = getNextRenewalDate(today);
+      
+      // If the suggested date is today or in the past, move it forward one more cycle
+      while (nextFromToday.isBefore(today) || nextFromToday.isAtSameMomentAs(today)) {
+        nextFromToday = getNextRenewalDate(nextFromToday);
+      }
+      
+      return nextFromToday;
     }
   }
 
@@ -102,6 +145,35 @@ class Subscription {
     }
   }
 
+  // Get status display text with color
+  String get statusDisplayText {
+    switch (status) {
+      case SubscriptionStatus.active:
+        return 'Active';
+      case SubscriptionStatus.cancelled:
+        return 'Cancelled';
+      case SubscriptionStatus.paused:
+        return 'Paused';
+      case SubscriptionStatus.expired:
+        return 'Expired';
+    }
+  }
+
+  // Check if subscription is overdue
+  bool get isOverdue => status == SubscriptionStatus.active && daysUntilRenewal < 0;
+
+  // Get total amount spent on this subscription
+  double get totalAmountSpent {
+    return amount * (renewalCount + 1); // +1 for initial subscription
+  }
+
+  // Get subscription duration in months
+  int get subscriptionDurationInMonths {
+    final now = DateTime.now();
+    final duration = now.difference(createdDate);
+    return (duration.inDays / 30).round();
+  }
+
   Subscription copyWith({
     int? id,
     String? name,
@@ -111,6 +183,10 @@ class Subscription {
     String? category,
     String? notes,
     BillingPeriod? billingPeriod,
+    SubscriptionStatus? status,
+    DateTime? createdDate,
+    DateTime? lastRenewDate,
+    int? renewalCount,
   }) {
     return Subscription(
       id: id ?? this.id,
@@ -121,6 +197,33 @@ class Subscription {
       category: category ?? this.category,
       notes: notes ?? this.notes,
       billingPeriod: billingPeriod ?? this.billingPeriod,
+      status: status ?? this.status,
+      createdDate: createdDate ?? this.createdDate,
+      lastRenewDate: lastRenewDate ?? this.lastRenewDate,
+      renewalCount: renewalCount ?? this.renewalCount,
+    );
+  }
+
+  // Create a renewed version of this subscription
+  Subscription createRenewed({
+    required DateTime newRenewalDate,
+    double? newAmount,
+    String? newNotes,
+  }) {
+    return copyWith(
+      renewalDate: newRenewalDate,
+      amount: newAmount ?? amount,
+      notes: newNotes ?? notes,
+      lastRenewDate: DateTime.now(),
+      renewalCount: renewalCount + 1,
+    );
+  }
+
+  // Create a cancelled version of this subscription
+  Subscription createCancelled({String? cancellationNotes}) {
+    return copyWith(
+      status: SubscriptionStatus.cancelled,
+      notes: cancellationNotes ?? notes,
     );
   }
 }
@@ -169,4 +272,27 @@ enum BillingPeriod {
         return 12;
     }
   }
+}
+
+enum SubscriptionStatus {
+  active,
+  cancelled,
+  paused,
+  expired;
+
+  String get displayName {
+    switch (this) {
+      case SubscriptionStatus.active:
+        return 'Active';
+      case SubscriptionStatus.cancelled:
+        return 'Cancelled';
+      case SubscriptionStatus.paused:
+        return 'Paused';
+      case SubscriptionStatus.expired:
+        return 'Expired';
+    }
+  }
+
+  bool get isActive => this == SubscriptionStatus.active;
+  bool get isCancelled => this == SubscriptionStatus.cancelled;
 }

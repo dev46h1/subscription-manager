@@ -4,6 +4,8 @@ import '../providers/subscription_provider.dart';
 import '../models/subscription.dart';
 import '../widgets/subscription_card.dart';
 import 'add_edit_screen.dart';
+import 'subscription_detail_screen.dart';
+import 'cancelled_subscriptions_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -50,6 +52,54 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('My Subscriptions'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          Consumer<SubscriptionProvider>(
+            builder: (context, provider, child) {
+              final cancelledCount = provider.cancelledSubscriptions.length;
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.archive),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CancelledSubscriptionsScreen(),
+                        ),
+                      ).then((_) {
+                        // Refresh data when returning from cancelled screen
+                        _loadSubscriptionsWithErrorHandling();
+                      });
+                    },
+                    tooltip: 'Cancelled Subscriptions',
+                  ),
+                  if (cancelledCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
+                        child: Text(
+                          '$cancelledCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.insights),
             onPressed: _showSpendingSummary,
@@ -84,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No subscriptions yet',
+                    'No active subscriptions',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 8),
@@ -95,6 +145,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
+                  if (provider.cancelledSubscriptions.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CancelledSubscriptionsScreen(),
+                          ),
+                        ).then((_) {
+                          _loadSubscriptionsWithErrorHandling();
+                        });
+                      },
+                      icon: const Icon(Icons.archive),
+                      label: Text('View ${provider.cancelledSubscriptions.length} Cancelled'),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -201,11 +268,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Subscription Breakdown',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Active Subscriptions Breakdown',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              '${provider.subscriptions.length} total',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         Wrap(
@@ -251,14 +333,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         return SubscriptionCard(
                           subscription: subscription,
                           onTap: () {
+                            // Navigate to detail screen instead of edit screen
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => AddEditSubscriptionScreen(
+                                builder: (context) => SubscriptionDetailScreen(
                                   subscription: subscription,
                                 ),
                               ),
-                            );
+                            ).then((result) {
+                              // Refresh data when returning from detail screen
+                              if (result == true) {
+                                _loadSubscriptionsWithErrorHandling();
+                              }
+                            });
                           },
                         );
                       },
@@ -283,7 +371,10 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(
               builder: (context) => const AddEditSubscriptionScreen(),
             ),
-          );
+          ).then((_) {
+            // Refresh data when returning from add screen
+            _loadSubscriptionsWithErrorHandling();
+          });
         },
         icon: const Icon(Icons.add),
         label: const Text('Add Subscription'),
@@ -346,6 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final provider = context.read<SubscriptionProvider>();
       final spendByCategory = provider.spendByCategory;
       final spendByPeriod = provider.spendByBillingPeriod;
+      final stats = provider.subscriptionStats;
       
       showModalBottomSheet(
         context: context,
@@ -379,6 +471,57 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Quick stats
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Active Subscriptions:'),
+                                Text(
+                                  '${stats['totalActiveSubscriptions']}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Cancelled Subscriptions:'),
+                                Text(
+                                  '${stats['totalCancelledSubscriptions']}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Expiring This Week:'),
+                                Text(
+                                  '${stats['upcomingRenewalsThisWeek']}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: stats['upcomingRenewalsThisWeek'] > 0 
+                                        ? Colors.orange 
+                                        : null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
                       // Category breakdown
                       Text(
                         'Monthly Spending by Category',
