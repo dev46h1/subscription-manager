@@ -18,9 +18,7 @@ class SubscriptionProvider extends ChangeNotifier {
   double get totalMonthlySpend {
     double total = 0;
     for (var sub in _subscriptions) {
-      // Convert to USD for calculation (you might want to add real conversion rates)
-      double amountInUSD = sub.amount;
-      total += amountInUSD;
+      total += sub.amount;
     }
     return total;
   }

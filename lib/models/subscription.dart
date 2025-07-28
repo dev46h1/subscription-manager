@@ -42,7 +42,15 @@ class Subscription {
   }
 
   int get daysUntilRenewal {
-    return renewalDate.difference(DateTime.now()).inDays;
+    // Get today's date at midnight (start of day)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Get renewal date at midnight (start of day)
+    final renewal = DateTime(renewalDate.year, renewalDate.month, renewalDate.day);
+    
+    // Calculate difference in days
+    return renewal.difference(today).inDays;
   }
 
   Subscription copyWith({

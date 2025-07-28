@@ -69,47 +69,73 @@ class NotificationService {
     // Handle notification tap - you can navigate to specific screen here
   }
 
-  Future<void> scheduleNotification(Subscription subscription) async {
-    if (!_isInitialized) {
-      print('NotificationService not initialized');
-      return;
-    }
+ Future<void> scheduleNotification(Subscription subscription) async {
+  if (!_isInitialized) {
+    print('NotificationService not initialized');
+    return;
+  }
 
-    try {
-      final subscriptionId = subscription.id ?? 0;
+  try {
+    final subscriptionId = subscription.id ?? 0;
+    
+    // Cancel any existing notifications for this subscription
+    await cancelNotification(subscriptionId);
+    
+    // Use consistent date calculation
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final renewalDate = DateTime(
+      subscription.renewalDate.year,
+      subscription.renewalDate.month,
+      subscription.renewalDate.day,
+    );
+    
+    final daysUntilRenewal = renewalDate.difference(today).inDays;
+    
+    // Handle notification 1 day before renewal
+    final oneDayBefore = renewalDate.subtract(const Duration(days: 1));
+    
+    if (daysUntilRenewal == 1) {
+      // If renewal is tomorrow, show notification immediately
+      await _showImmediateNotification(
+        id: subscriptionId * 10 + 1,
+        title: 'Subscription Renewal Tomorrow',
+        body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        payload: 'subscription_${subscription.id}_1day',
+      );
+      print('Showed immediate 1-day reminder for ${subscription.name}');
+    } else if (daysUntilRenewal > 1) {
+      // If renewal is more than 1 day away, schedule the 1-day reminder
+      final oneDayBeforeTime = DateTime(
+        oneDayBefore.year,
+        oneDayBefore.month,
+        oneDayBefore.day,
+        9, // 9 AM
+        0,
+      );
       
-      // Cancel any existing notifications for this subscription
-      await cancelNotification(subscriptionId);
-      
-      final now = DateTime.now();
-      final renewalDate = subscription.renewalDate;
-      
-      // Handle notification 1 day before renewal
-      final oneDayBefore = renewalDate.subtract(const Duration(days: 1));
-      final daysUntilRenewal = renewalDate.difference(now).inDays;
-      
-      if (daysUntilRenewal == 1) {
-        // If renewal is tomorrow, show notification immediately (regardless of time)
-        await _showImmediateNotification(
-          id: subscriptionId * 10 + 1,
-          title: 'Subscription Renewal Tomorrow',
-          body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
-          payload: 'subscription_${subscription.id}_1day',
-        );
-        print('Showed immediate 1-day reminder for ${subscription.name}');
-      } else if (oneDayBefore.isAfter(now)) {
-        // If renewal is more than 1 day away, schedule the 1-day reminder
-        await _scheduleNotificationAt(
-          id: subscriptionId * 10 + 1,
-          scheduledDate: oneDayBefore,
-          title: 'Subscription Renewal Tomorrow',
-          body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
-          payload: 'subscription_${subscription.id}_1day',
-        );
-        print('Scheduled 1-day reminder for ${subscription.name} at $oneDayBefore');
-      }
-      
-      // Handle notification on renewal day
+      await _scheduleNotificationAt(
+        id: subscriptionId * 10 + 1,
+        scheduledDate: oneDayBeforeTime,
+        title: 'Subscription Renewal Tomorrow',
+        body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        payload: 'subscription_${subscription.id}_1day',
+      );
+      print('Scheduled 1-day reminder for ${subscription.name} at $oneDayBeforeTime');
+    }
+    
+    // Handle notification on renewal day
+    if (daysUntilRenewal == 0) {
+      // If renewal is today, show notification immediately
+      await _showImmediateNotification(
+        id: subscriptionId * 10 + 2,
+        title: 'Subscription Renewing Today',
+        body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        payload: 'subscription_${subscription.id}_today',
+      );
+      print('Showed immediate renewal day reminder for ${subscription.name}');
+    } else if (daysUntilRenewal > 0) {
+      // If renewal day hasn't arrived yet, schedule it for 9 AM
       final renewalDayMorning = DateTime(
         renewalDate.year,
         renewalDate.month,
@@ -118,31 +144,20 @@ class NotificationService {
         0,
       );
       
-      if (daysUntilRenewal == 0) {
-        // If renewal is today, show notification immediately (regardless of time)
-        await _showImmediateNotification(
-          id: subscriptionId * 10 + 2,
-          title: 'Subscription Renewing Today',
-          body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
-          payload: 'subscription_${subscription.id}_today',
-        );
-        print('Showed immediate renewal day reminder for ${subscription.name}');
-      } else if (renewalDayMorning.isAfter(now)) {
-        // If renewal day hasn't arrived yet, schedule it for 9 AM
-        await _scheduleNotificationAt(
-          id: subscriptionId * 10 + 2,
-          scheduledDate: renewalDayMorning,
-          title: 'Subscription Renewing Today',
-          body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
-          payload: 'subscription_${subscription.id}_today',
-        );
-        print('Scheduled renewal day reminder for ${subscription.name} at $renewalDayMorning');
-      }
-      
-    } catch (e) {
-      print('Error scheduling notification for ${subscription.name}: $e');
+      await _scheduleNotificationAt(
+        id: subscriptionId * 10 + 2,
+        scheduledDate: renewalDayMorning,
+        title: 'Subscription Renewing Today',
+        body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        payload: 'subscription_${subscription.id}_today',
+      );
+      print('Scheduled renewal day reminder for ${subscription.name} at $renewalDayMorning');
     }
+    
+  } catch (e) {
+    print('Error scheduling notification for ${subscription.name}: $e');
   }
+}
 
   Future<void> _showImmediateNotification({
     required int id,
@@ -280,35 +295,51 @@ class NotificationService {
   }
 
   Future<void> _scheduleNotificationQuietly(Subscription subscription) async {
-    if (!_isInitialized) {
-      print('NotificationService not initialized');
-      return;
-    }
+  if (!_isInitialized) {
+    print('NotificationService not initialized');
+    return;
+  }
 
-    try {
-      final subscriptionId = subscription.id ?? 0;
-      
-      // Cancel any existing notifications for this subscription
-      await cancelNotification(subscriptionId);
-      
-      final now = DateTime.now();
-      final renewalDate = subscription.renewalDate;
-      final daysUntilRenewal = renewalDate.difference(now).inDays;
-      
-      // Schedule notification 1 day before renewal (only if it's in the future)
+  try {
+    final subscriptionId = subscription.id ?? 0;
+    
+    // Cancel any existing notifications for this subscription
+    await cancelNotification(subscriptionId);
+    
+    // Use consistent date calculation
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final renewalDate = DateTime(
+      subscription.renewalDate.year,
+      subscription.renewalDate.month,
+      subscription.renewalDate.day,
+    );
+    
+    final daysUntilRenewal = renewalDate.difference(today).inDays;
+    
+    // Schedule notification 1 day before renewal (only if it's in the future)
+    if (daysUntilRenewal > 1) {
       final oneDayBefore = renewalDate.subtract(const Duration(days: 1));
-      if (oneDayBefore.isAfter(now)) {
-        await _scheduleNotificationAt(
-          id: subscriptionId * 10 + 1,
-          scheduledDate: oneDayBefore,
-          title: 'Subscription Renewal Tomorrow',
-          body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
-          payload: 'subscription_${subscription.id}_1day',
-        );
-        print('Quietly scheduled 1-day reminder for ${subscription.name} at $oneDayBefore');
-      }
+      final oneDayBeforeTime = DateTime(
+        oneDayBefore.year,
+        oneDayBefore.month,
+        oneDayBefore.day,
+        9, // 9 AM
+        0,
+      );
       
-      // Schedule notification on renewal day (only if it's in the future)
+      await _scheduleNotificationAt(
+        id: subscriptionId * 10 + 1,
+        scheduledDate: oneDayBeforeTime,
+        title: 'Subscription Renewal Tomorrow',
+        body: '${subscription.name} will renew tomorrow for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        payload: 'subscription_${subscription.id}_1day',
+      );
+      print('Quietly scheduled 1-day reminder for ${subscription.name} at $oneDayBeforeTime');
+    }
+    
+    // Schedule notification on renewal day (only if it's in the future)
+    if (daysUntilRenewal > 0) {
       final renewalDayMorning = DateTime(
         renewalDate.year,
         renewalDate.month,
@@ -317,21 +348,20 @@ class NotificationService {
         0,
       );
       
-      if (renewalDayMorning.isAfter(now)) {
-        await _scheduleNotificationAt(
-          id: subscriptionId * 10 + 2,
-          scheduledDate: renewalDayMorning,
-          title: 'Subscription Renewing Today',
-          body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
-          payload: 'subscription_${subscription.id}_today',
-        );
-        print('Quietly scheduled renewal day reminder for ${subscription.name} at $renewalDayMorning');
-      }
-      
-    } catch (e) {
-      print('Error quietly scheduling notification for ${subscription.name}: $e');
+      await _scheduleNotificationAt(
+        id: subscriptionId * 10 + 2,
+        scheduledDate: renewalDayMorning,
+        title: 'Subscription Renewing Today',
+        body: '${subscription.name} is renewing today for ${subscription.currency} ${subscription.amount.toStringAsFixed(2)}',
+        payload: 'subscription_${subscription.id}_today',
+      );
+      print('Quietly scheduled renewal day reminder for ${subscription.name} at $renewalDayMorning');
     }
+    
+  } catch (e) {
+    print('Error quietly scheduling notification for ${subscription.name}: $e');
   }
+}
 
   Future<void> _printPendingNotifications() async {
     try {
